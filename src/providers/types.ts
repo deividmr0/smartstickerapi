@@ -50,6 +50,7 @@ export interface Provider {
   getDevice(zone: ZoneCode, imei: string): Promise<Device | null>;
   listLocationsByZone(zone: ZoneCode): Promise<DeviceLocation[]>;
   getLocationByImei(zone: ZoneCode, imei: string): Promise<DeviceLocation | null>;
+  refreshZoneToken(zone: ZoneCode): Promise<void>;
   listDeviceTrack(
     zone: ZoneCode,
     imei: string,

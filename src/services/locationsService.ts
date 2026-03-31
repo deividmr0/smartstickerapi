@@ -1,6 +1,14 @@
 import { ApiError } from '../lib/errors.js';
 import type { FastifyInstance } from 'fastify';
 import { getZoneByCode } from '../db/zonesRepo.js';
+import {
+  getTrackPointsByRange,
+  getTrackWindow,
+  mapMileageFromCache,
+  mapTrackPointFromCache,
+  upsertTrackPoints,
+  upsertTrackWindow,
+} from '../db/deviceTrackCacheRepo.js';
 
 const JIMI_UTC_REGEX = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
 
@@ -47,6 +55,11 @@ function parseAndValidateRange(beginTime?: string, endTime?: string) {
   return { beginTime: begin, endTime: end };
 }
 
+function isCacheFresh(lastSyncedAt: Date | null, ttlSeconds: number): boolean {
+  if (!lastSyncedAt || ttlSeconds <= 0) return false;
+  return Date.now() - lastSyncedAt.getTime() <= ttlSeconds * 1000;
+}
+
 export async function listLocationsByZone(app: FastifyInstance, zoneCode: string) {
   const zone = await getZoneByCode(app.db, zoneCode);
   if (!zone || zone.is_active !== 1) throw new ApiError('NOT_FOUND', 'Zona no encontrada', 404);
@@ -75,7 +88,23 @@ export async function listDeviceTrackByImei(
   if (!zone || zone.is_active !== 1) throw new ApiError('NOT_FOUND', 'Zona no encontrada', 404);
 
   const range = parseAndValidateRange(beginTime, endTime);
+  const ttl = app.config.LOCATIONS_CACHE_TTL_SECONDS;
+  const cachedWindow = await getTrackWindow(app.db, zone.id, imei, range.beginTime, range.endTime);
+
+  if (cachedWindow && isCacheFresh(cachedWindow.last_synced_at, ttl)) {
+    const cachedRows = await getTrackPointsByRange(app.db, zone.id, imei, range.beginTime, range.endTime);
+    return {
+      points: cachedRows.map(mapTrackPointFromCache),
+      mileage: mapMileageFromCache(cachedWindow.mileage),
+      beginTime: range.beginTime,
+      endTime: range.endTime,
+      cached: true,
+    };
+  }
+
   const { points, mileage } = await app.provider.listDeviceTrack(zoneCode, imei, range.beginTime, range.endTime);
+  await upsertTrackPoints(app.db, zone.id, imei, points);
+  await upsertTrackWindow(app.db, zone.id, imei, range.beginTime, range.endTime, mileage);
 
   return { points, mileage, beginTime: range.beginTime, endTime: range.endTime, cached: false };
 }

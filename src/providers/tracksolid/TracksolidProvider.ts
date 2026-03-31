@@ -136,7 +136,7 @@ export class TracksolidProvider implements Provider {
     private readonly encryptionKeyB64: string,
   ) {}
 
-  private async getClientAndToken(zoneCode: string) {
+  async refreshZoneToken(zoneCode: string): Promise<void> {
     const zone = await getZoneByCode(this.db, zoneCode);
     if (!zone || zone.is_active !== 1) throw new ApiError('NOT_FOUND', 'Zona no encontrada', 404);
 
@@ -156,6 +156,61 @@ export class TracksolidProvider implements Provider {
     };
 
     const refreshToken = async (accessToken: string, refreshToken: string): Promise<JimiTokenResult> => {
+      return client.call<JimiTokenResult>('jimi.oauth.token.refresh', {
+        access_token: accessToken,
+        refresh_token: refreshToken,
+        expires_in: '7200',
+      });
+    };
+
+    const persistTokens = async (t: JimiTokenResult) => {
+      const expSeconds = expiresInSeconds(t.expiresIn);
+      const expiresAt = new Date(Date.now() + expSeconds * 1000);
+      await updateZoneTokens(this.db, zone.id, {
+        access_token_encrypted: encryptString(t.accessToken, this.encryptionKeyB64),
+        refresh_token_encrypted: encryptString(t.refreshToken, this.encryptionKeyB64),
+        token_expires_at: expiresAt,
+      });
+    };
+
+    if (creds.access_token_encrypted && creds.refresh_token_encrypted) {
+      const at = decryptString(creds.access_token_encrypted, this.encryptionKeyB64);
+      const rt = decryptString(creds.refresh_token_encrypted, this.encryptionKeyB64);
+      try {
+        const refreshed = await refreshToken(at, rt);
+        await persistTokens(refreshed);
+        return;
+      } catch {
+        // fallback a token.get
+      }
+    }
+
+    const fresh = await getNewToken();
+    await persistTokens(fresh);
+  }
+
+  private async getClientAndToken(zoneCode: string) {
+    const zone = await getZoneByCode(this.db, zoneCode);
+    if (!zone || zone.is_active !== 1) throw new ApiError('NOT_FOUND', 'Zona no encontrada', 404);
+
+    const creds = await getZoneCredentialsByZoneId(this.db, zone.id);
+    if (!creds) throw new UpstreamNotConfiguredError('No hay credenciales configuradas para esta zona');
+
+    const appSecret = decryptString(creds.app_secret_encrypted, this.encryptionKeyB64);
+    const userPwdMd5 = decryptString(creds.user_pwd_md5_encrypted, this.encryptionKeyB64);
+    const client = new JimiClient(zone.base_url, creds.app_key, appSecret);
+    console.log('client', client);
+    const getNewToken = async (): Promise<JimiTokenResult> => {
+      console.log('getNewToken', creds.user_id, userPwdMd5);
+      return client.call<JimiTokenResult>('jimi.oauth.token.get', {
+        user_id: creds.user_id,
+        user_pwd_md5: userPwdMd5,
+        expires_in: '7200',
+      });
+    };
+
+    const refreshToken = async (accessToken: string, refreshToken: string): Promise<JimiTokenResult> => {
+      console.log('refreshToken', accessToken, refreshToken);
       return client.call<JimiTokenResult>('jimi.oauth.token.refresh', {
         access_token: accessToken,
         refresh_token: refreshToken,

@@ -14,12 +14,14 @@
     "migrate:latest": "npm run knex -- migrate:latest",
     "migrate:make": "npm run knex -- migrate:make",
     "seed:run": "npm run knex -- seed:run",
-    "creds:set": "tsx scripts/set-zone-credentials.ts"
+    "creds:set": "tsx scripts/set-zone-credentials.ts",
+    "apikeys:generate": "tsx scripts/generate-api-keys.ts"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@fastify/cors": "^11.2.0",
     "@fastify/env": "^5.0.3",
     "@fastify/jwt": "^10.0.0",
     "@fastify/rate-limit": "^10.3.0",

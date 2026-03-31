@@ -1,5 +1,6 @@
 import Fastify from 'fastify';
 import sensible from '@fastify/sensible';
+import cors from '@fastify/cors';
 import swagger from '@fastify/swagger';
 import swaggerUI from '@fastify/swagger-ui';
 import { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
@@ -11,7 +12,6 @@ import { providerPlugin } from './plugins/provider.js';
 import { authPlugin } from './plugins/auth.js';
 
 import { healthRoutes } from './routes/health.js';
-import { authRoutes } from './routes/auth.js';
 import { zonesRoutes } from './routes/zones.js';
 import { devicesRoutes } from './routes/devices.js';
 import { cacheRoutes } from './routes/cache.js';
@@ -25,6 +25,10 @@ export function buildApp() {
 
   app.register(envPlugin);
   app.register(sensible);
+  app.register(cors, {
+    origin: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  });
 
   app.register(swagger, {
     openapi: {
@@ -39,7 +43,6 @@ export function buildApp() {
   app.register(authPlugin);
 
   app.register(healthRoutes);
-  app.register(authRoutes);
   app.register(zonesRoutes, { prefix: '/v1' });
   app.register(devicesRoutes, { prefix: '/v1' });
   app.register(cacheRoutes, { prefix: '/v1' });

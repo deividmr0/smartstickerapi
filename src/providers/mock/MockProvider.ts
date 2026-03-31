@@ -65,6 +65,10 @@ export class MockProvider implements Provider {
     return (await this.listLocationsByZone(zone)).find((l) => l.imei === imei) ?? null;
   }
 
+  async refreshZoneToken(_zone: string): Promise<void> {
+    // No-op in mock mode.
+  }
+
   async listDeviceTrack(
     zone: string,
     imei: string,

@@ -17,12 +17,6 @@ export const EnvSchema = Type.Object({
     ]),
   ),
 
-  B2B_CLIENT_ID: Type.String({ minLength: 1 }),
-  B2B_CLIENT_SECRET: Type.String({ minLength: 1 }),
-
-  JWT_SECRET: Type.String({ minLength: 16 }),
-  JWT_EXPIRES_IN: Type.Optional(Type.String({ default: '8h' })),
-
   ENCRYPTION_KEY_B64: Type.String({ minLength: 10 }),
 
   DB_HOST: Type.String({ minLength: 1 }),
@@ -32,6 +26,7 @@ export const EnvSchema = Type.Object({
   DB_NAME: Type.String({ minLength: 1 }),
 
   DEVICES_CACHE_TTL_SECONDS: Type.Integer({ default: 900, minimum: 0 }),
+  LOCATIONS_CACHE_TTL_SECONDS: Type.Integer({ default: 300, minimum: 0 }),
   PROVIDER_MODE: Type.Optional(Type.Union([Type.Literal('mock'), Type.Literal('tracksolid')])),
 });
 
